@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write  ## NEEDED!!!
-  contents: read
+  contents: write  ## CHANGED from 'read' to 'write' so we can push manifest updates
 
 jobs:
   credentials_build_deploy:
@@ -19,7 +19,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
+      uses: aws-actions/configure-aws-credentials@v4 ## Upgraded to v4
       with:
         role-to-assume: arn:aws:iam::611434859417:role/GitHubActionRole-EKS  # change AWS account HERE
         aws-region: us-east-1
@@ -36,9 +36,27 @@ jobs:
         IMAGE_TAG=$(git rev-parse --short "$GITHUB_SHA")
         ENV=main                                    ## CHANGE Env Name HERE!!!
         BRANCH=${GITHUB_REF##*/}
+        FULL_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG"
         
-        docker build -f Dockerfile-$ENV --build-arg ARG_ENV=${ENV} -t $ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG
-        echo $IMAGE_TAG
-        cd manifest/main                                                             ## CHANGE DIR Name HERE!!!
-        sed -i "s|CHANGE-IMAGE-NAME|$ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG|g" deployment.yaml
+        # Build and push the image
+        docker build -f Dockerfile-$ENV --build-arg ARG_ENV=${ENV} -t $FULL_IMAGE_URI .
+        docker push $FULL_IMAGE_URI
+        
+        # Update the deployment manifest locally in the runner
+        cd manifest/main                            ## CHANGE DIR Name HERE!!!
+        sed -i "s|CHANGE-IMAGE-NAME|$FULL_IMAGE_URI|g" deployment.yaml
+
+    # NEW STEP: Commit and push the updated deployment file back to GitHub
+    - name: Commit and Push Manifest Changes
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        # Stage the changed file
+        git add manifest/main/deployment.yaml
+        
+        # Commit with [skip ci] to prevent infinite workflow loops
+        git commit -m "image deployment update: auto-updated by github actions [skip ci]"
+        
+        # Push changes back to the active branch
+        git push origin main
