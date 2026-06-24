@@ -42,9 +42,9 @@ jobs:
         docker build -f Dockerfile-$ENV --build-arg ARG_ENV=${ENV} -t $FULL_IMAGE_URI .
         docker push $FULL_IMAGE_URI
         
-        # 2. Dynamically update the image key in deployment.yaml using yq
+        # 2. Dynamically update using --arg (safely maps the shell variable to a yq variable)
         cd manifest/main                            ## CHANGE DIR Name HERE!!!
-        yq -i '.spec.template.spec.containers[0].image = env(FULL_IMAGE_URI)' deployment.yaml
+        yq -i --arg new_img "$FULL_IMAGE_URI" '.spec.template.spec.containers[0].image = $new_img' deployment.yaml
 
     - name: Commit and Push Manifest Changes to GitHub
       run: |
