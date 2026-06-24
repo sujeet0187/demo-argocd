@@ -1,0 +1,44 @@
+name: argocd-eks ## $Project Name / $Branch
+
+on:
+  push:
+    branches:
+      - main ## CHANGE Branch Name HERE !!!
+
+permissions:
+  id-token: write  ## NEEDED!!!
+  contents: read
+
+jobs:
+  credentials_build_deploy:
+    name: Building and Pushing the Image
+    runs-on: [ubuntu-latest] ## private/public runner
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: arn:aws:iam::611434859417:role/GitHubActionRole-EKS  # change AWS account HERE
+        aws-region: us-east-1
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2      
+
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY:  ${{ steps.login-ecr.outputs.registry }}         
+        ECR_REPOSITORY: agrocd  ## CHANGE ECR Name HERE!!!
+      run: |
+        IMAGE_TAG=$(git rev-parse --short "$GITHUB_SHA")
+        ENV=main                                    ## CHANGE Env Name HERE!!!
+        BRANCH=${GITHUB_REF##*/}
+        
+        docker build -f Dockerfile-$ENV --build-arg ARG_ENV=${ENV} -t $ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG
+        echo $IMAGE_TAG
+        cd manifest/main                                                             ## CHANGE DIR Name HERE!!!
+        sed -i "s|CHANGE-IMAGE-NAME|$ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG|g" deployment.yaml
