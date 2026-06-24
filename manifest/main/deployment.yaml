@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-main
+  namespace: argocd-main
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: argocd-main
+  template:
+    metadata:
+      labels:
+        app: argocd-main
+    spec:
+      containers:
+      - name: argocd-main
+        image: CHANGE-IMAGE-NAME
+        imagePullPolicy:
+        ports:
+        - containerPort: 80
