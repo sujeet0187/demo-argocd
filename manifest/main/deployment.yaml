@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: argocd-main
-          image: 611434859417.dkr.ecr.us-east-1.amazonaws.com/agrocd:main-b9c3f06
+          image: 611434859417.dkr.ecr.us-east-1.amazonaws.com/agrocd:main-9f9f2ca
           imagePullPolicy:
           ports:
             - containerPort: 80
