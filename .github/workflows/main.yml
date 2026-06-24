@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write  ## NEEDED!!!
-  contents: write  ## CHANGED from 'read' to 'write' so we can push manifest updates
+  contents: write  ## CHANGED to 'write' so the runner can push manifest updates back to GitHub
 
 jobs:
   credentials_build_deploy:
@@ -15,11 +15,11 @@ jobs:
     runs-on: [ubuntu-latest] ## private/public runner
 
     steps:
-    - name: Checkout
+    - name: Checkout Code
       uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4 ## Upgraded to v4
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: arn:aws:iam::611434859417:role/GitHubActionRole-EKS  # change AWS account HERE
         aws-region: us-east-1
@@ -28,7 +28,7 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2      
 
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build, tag, push image, and update manifest
       env:
         ECR_REGISTRY:  ${{ steps.login-ecr.outputs.registry }}         
         ECR_REPOSITORY: agrocd  ## CHANGE ECR Name HERE!!!
@@ -38,25 +38,24 @@ jobs:
         BRANCH=${GITHUB_REF##*/}
         FULL_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG"
         
-        # Build and push the image
+        # 1. Build and push the image to ECR
         docker build -f Dockerfile-$ENV --build-arg ARG_ENV=${ENV} -t $FULL_IMAGE_URI .
         docker push $FULL_IMAGE_URI
         
-        # Update the deployment manifest locally in the runner
+        # 2. Dynamically update the image key in deployment.yaml using yq
         cd manifest/main                            ## CHANGE DIR Name HERE!!!
-        sed -i "s|CHANGE-IMAGE-NAME|$FULL_IMAGE_URI|g" deployment.yaml
+        yq -i '.spec.template.spec.containers[0].image = env(FULL_IMAGE_URI)' deployment.yaml
 
-    # NEW STEP: Commit and push the updated deployment file back to GitHub
-    - name: Commit and Push Manifest Changes
+    - name: Commit and Push Manifest Changes to GitHub
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
         
-        # Stage the changed file
-        git add manifest/main/deployment.yaml
+        # Stage the updated manifest file
+        git add manifest/main/deployment.yaml       ## CHANGE DIR Name HERE!!!
         
-        # Commit with [skip ci] to prevent infinite workflow loops
+        # [skip ci] prevents this commit from triggering another workflow run infinitely
         git commit -m "image deployment update: auto-updated by github actions [skip ci]"
         
-        # Push changes back to the active branch
+        # Push the changes back to your tracking branch
         git push origin main
