@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write  ## NEEDED!!!
-  contents: write  ## CHANGED to 'write' so the runner can push manifest updates back to GitHub
+  contents: write  ## ALLOWS runner to push manifest updates back to GitHub
 
 jobs:
   credentials_build_deploy:
@@ -36,15 +36,17 @@ jobs:
         IMAGE_TAG=$(git rev-parse --short "$GITHUB_SHA")
         ENV=main                                    ## CHANGE Env Name HERE!!!
         BRANCH=${GITHUB_REF##*/}
-        FULL_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG"
+        
+        # CRITICAL: 'export' makes this variable visible to the yq binary process
+        export FULL_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$BRANCH-$IMAGE_TAG"
         
         # 1. Build and push the image to ECR
         docker build -f Dockerfile-$ENV --build-arg ARG_ENV=${ENV} -t $FULL_IMAGE_URI .
         docker push $FULL_IMAGE_URI
         
-        # 2. Dynamically update using --arg (safely maps the shell variable to a yq variable)
+        # 2. Dynamically update the image key in deployment.yaml using env()
         cd manifest/main                            ## CHANGE DIR Name HERE!!!
-        yq -i --arg new_img "$FULL_IMAGE_URI" '.spec.template.spec.containers[0].image = $new_img' deployment.yaml
+        yq -i '.spec.template.spec.containers[0].image = env(FULL_IMAGE_URI)' deployment.yaml
 
     - name: Commit and Push Manifest Changes to GitHub
       run: |
@@ -54,7 +56,7 @@ jobs:
         # Stage the updated manifest file
         git add manifest/main/deployment.yaml       ## CHANGE DIR Name HERE!!!
         
-        # [skip ci] prevents this commit from triggering another workflow run infinitely
+        # [skip ci] prevents an infinite loop of workflow triggers
         git commit -m "image deployment update: auto-updated by github actions [skip ci]"
         
         # Push the changes back to your tracking branch
