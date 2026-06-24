@@ -51,13 +51,13 @@ jobs:
     - name: Commit and Push Manifest Changes to GitHub
       run: |
         git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global user.email "136491085+github-actions[bot]@users.noreply.github.com"
         
         # Stage the updated manifest file
         git add manifest/main/deployment.yaml       ## CHANGE DIR Name HERE!!!
         
         # [skip ci] prevents an infinite loop of workflow triggers
-        git commit -m "image deployment update: auto-updated by github actions [skip ci]"
+        git commit -m "image deployment update: auto-updated by github actions"
         
         # Push the changes back to your tracking branch
         git push origin main
