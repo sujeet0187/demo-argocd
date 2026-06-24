@@ -16,8 +16,8 @@ spec:
         app: argocd-main
     spec:
       containers:
-      - name: argocd-main
-        image: 611434859417.dkr.ecr.us-east-1.amazonaws.com/agrocd:main-e85c523
-        imagePullPolicy:
-        ports:
-        - containerPort: 80
+        - name: argocd-main
+          image: 611434859417.dkr.ecr.us-east-1.amazonaws.com/agrocd:main-17a556c
+          imagePullPolicy:
+          ports:
+            - containerPort: 80
